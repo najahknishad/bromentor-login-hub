@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import StudentDashboard from "@/components/dashboard/StudentDashboard";
 import SupportDashboard from "@/components/dashboard/SupportDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 type UserRole = 'student' | 'support' | 'admin';
 
@@ -79,9 +80,12 @@ const Dashboard = () => {
               <p className="text-sm text-text-secondary capitalize">{userRole} Dashboard</p>
             </div>
           </div>
-          <Button onClick={handleLogout} variant="outline">
-            Logout
-          </Button>
+          <div className="flex items-center space-x-4">
+            <NotificationBell />
+            <Button onClick={handleLogout} variant="outline">
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
