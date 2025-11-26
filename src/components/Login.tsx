@@ -5,6 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 // Email validation schema for enhanced security
 const emailSchema = z.string().email("Please enter a valid email address").trim();
@@ -19,8 +21,9 @@ const Login = () => {
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  // Handle sending OTP
+  // Handle sending OTP - REAL EMAIL IMPLEMENTATION
   const handleSendOtp = async () => {
     // Validate email before sending OTP
     const emailValidation = emailSchema.safeParse(email);
@@ -36,22 +39,34 @@ const Login = () => {
 
     setIsLoading(true);
     
-    // Simulate OTP sending (replace with actual API call)
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Call edge function to send OTP via email
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { email: email.trim() }
+      });
+
+      if (error) throw error;
+
       setShowOtpInput(true);
       toast({
         title: "OTP Sent",
         description: "Please check your email for the 6-digit OTP",
       });
       
-      // In production, this would call an API endpoint to send the OTP
-      console.log("Sending OTP to:", email);
-      // OTP is 6-digit for enhanced security
-    }, 1000);
+      // OTP is 6-digit for enhanced security and sent via email using Resend
+    } catch (error: any) {
+      console.error("Error sending OTP:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle OTP verification
+  // Handle OTP verification - REAL AUTHENTICATION
   const handleVerifyOtp = async () => {
     // Validate OTP - must be exactly 6 digits
     const otpValidation = otpSchema.safeParse(otp);
@@ -67,10 +82,18 @@ const Login = () => {
 
     setIsLoading(true);
     
-    // Simulate OTP verification (replace with actual API call)
-    setTimeout(() => {
-      setIsLoading(false);
-      
+    try {
+      // Call edge function to verify OTP
+      const { data, error } = await supabase.functions.invoke('verify-otp', {
+        body: { email: email.trim(), otp: otp }
+      });
+
+      if (error) throw error;
+
+      if (!data.success) {
+        throw new Error(data.error || "OTP verification failed");
+      }
+
       // Session control based on checkbox
       // If keepSignedIn is true: user session remains active until 48 hours of inactivity
       // If keepSignedIn is false: normal session (logout on browser close or standard timeout)
@@ -81,10 +104,22 @@ const Login = () => {
         description: `Welcome to BroMentor! Session: ${sessionDuration}`,
       });
       
-      // In production, this would verify OTP with backend and set session cookies
-      console.log("Verifying OTP:", otp, "Keep signed in:", keepSignedIn);
       // Auto logout after 48 hours of inactivity is intentional for privacy & safety
-    }, 1000);
+      // Redirect to main page after successful login
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error("Error verifying OTP:", error);
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Invalid OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,7 +153,7 @@ const Login = () => {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-14 text-lg bg-input text-black placeholder:text-muted-foreground border-none rounded-xl"
+                className="h-14 text-lg bg-input placeholder:text-muted-foreground border-none rounded-xl !text-black"
                 disabled={isLoading}
               />
               
