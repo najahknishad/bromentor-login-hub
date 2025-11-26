@@ -102,9 +102,10 @@ const Login = () => {
           BroMentor
         </h1>
 
-        {/* Tagline - Single line as specified */}
-        <div className="text-center">
-          <p className="text-lg text-text-secondary">Your doubt. Our support – Resolved in record time.</p>
+        {/* Tagline - Exactly 2 lines as specified */}
+        <div className="text-center space-y-1">
+          <p className="text-lg text-text-secondary">Sign in to continue</p>
+          <p className="text-lg text-text-secondary">Built for Brototype students</p>
         </div>
 
         {/* Authentication Form */}
