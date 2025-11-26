@@ -118,7 +118,7 @@ const Login = () => {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-14 text-lg bg-input text-foreground placeholder:text-muted-foreground border-none rounded-xl"
+                className="h-14 text-lg bg-input text-black placeholder:text-muted-foreground border-none rounded-xl"
                 disabled={isLoading}
               />
               
