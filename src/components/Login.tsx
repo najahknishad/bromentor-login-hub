@@ -75,9 +75,8 @@ const Login = () => {
     }
   };
 
-  // Handle OTP verification - REAL AUTHENTICATION
+  // Handle OTP verification with role-based redirect
   const handleVerifyOtp = async () => {
-    // Validate OTP - must be exactly 6 digits
     const otpValidation = otpSchema.safeParse(otp);
     
     if (!otpValidation.success) {
@@ -92,7 +91,6 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // Call edge function to verify OTP
       const { data, error } = await supabase.functions.invoke('verify-otp', {
         body: { email: email.trim(), otp: otp }
       });
@@ -103,21 +101,46 @@ const Login = () => {
         throw new Error(data.error || "OTP verification failed");
       }
 
-      // Session control based on checkbox
-      // If keepSignedIn is true: user session remains active until 48 hours of inactivity
-      // If keepSignedIn is false: normal session (logout on browser close or standard timeout)
-      const sessionDuration = keepSignedIn ? "48 hours" : "standard session";
-      
+      // Set session from the response
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      }
+
       toast({
         title: "Login Successful",
-        description: `Welcome to BroMentor! Session: ${sessionDuration}`,
+        description: "Welcome to BroMentor!",
       });
-      
-      // Auto logout after 48 hours of inactivity is intentional for privacy & safety
-      // Redirect to main page after successful login
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
+
+      // Fetch user role and redirect
+      const userId = data.user?.id;
+      if (userId) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .single();
+
+        const role = roleData?.role || 'student';
+
+        // Navigate based on role
+        switch (role) {
+          case 'admin':
+            navigate('/admin', { replace: true });
+            break;
+          case 'support':
+            navigate('/support', { replace: true });
+            break;
+          case 'student':
+          default:
+            navigate('/dashboard', { replace: true });
+            break;
+        }
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
       
     } catch (error: any) {
       console.error("Error verifying OTP:", error);
@@ -223,6 +246,7 @@ const Login = () => {
                 onClick={() => {
                   setShowOtpInput(false);
                   setOtp("");
+                  setTestOtpHint(null);
                 }}
                 className="w-full text-text-secondary hover:text-foreground"
               >
