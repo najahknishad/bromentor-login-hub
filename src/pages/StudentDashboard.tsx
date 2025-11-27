@@ -40,15 +40,24 @@ const StudentDashboard = () => {
         </header>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <div className="bg-card p-6 rounded-xl border border-border">
+          <div 
+            onClick={() => navigate('/submit-doubt')}
+            className="bg-card p-6 rounded-xl border border-border cursor-pointer transition-all duration-200 hover:scale-105 hover:border-primary hover:shadow-lg"
+          >
             <h3 className="text-lg font-semibold text-foreground mb-2">Submit Doubt</h3>
             <p className="text-muted-foreground text-sm">Ask questions and get expert help</p>
           </div>
-          <div className="bg-card p-6 rounded-xl border border-border">
+          <div 
+            onClick={() => navigate('/my-doubts')}
+            className="bg-card p-6 rounded-xl border border-border cursor-pointer transition-all duration-200 hover:scale-105 hover:border-primary hover:shadow-lg"
+          >
             <h3 className="text-lg font-semibold text-foreground mb-2">My Doubts</h3>
             <p className="text-muted-foreground text-sm">Track your submitted doubts</p>
           </div>
-          <div className="bg-card p-6 rounded-xl border border-border">
+          <div 
+            onClick={() => navigate('/learning-progress')}
+            className="bg-card p-6 rounded-xl border border-border cursor-pointer transition-all duration-200 hover:scale-105 hover:border-primary hover:shadow-lg"
+          >
             <h3 className="text-lg font-semibold text-foreground mb-2">Learning Progress</h3>
             <p className="text-muted-foreground text-sm">View your engagement metrics</p>
           </div>

@@ -7,6 +7,9 @@ import Auth from "./pages/Auth";
 import StudentDashboard from "./pages/StudentDashboard";
 import SupportDashboard from "./pages/SupportDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import SubmitDoubt from "./pages/SubmitDoubt";
+import MyDoubts from "./pages/MyDoubts";
+import LearningProgress from "./pages/LearningProgress";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +24,9 @@ const App = () => (
           <Route path="/" element={<Navigate to="/auth" replace />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<StudentDashboard />} />
+          <Route path="/submit-doubt" element={<SubmitDoubt />} />
+          <Route path="/my-doubts" element={<MyDoubts />} />
+          <Route path="/learning-progress" element={<LearningProgress />} />
           <Route path="/support" element={<SupportDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
