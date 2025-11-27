@@ -20,6 +20,7 @@ const Login = () => {
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [testOtpHint, setTestOtpHint] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -48,12 +49,20 @@ const Login = () => {
       if (error) throw error;
 
       setShowOtpInput(true);
-      toast({
-        title: "OTP Sent",
-        description: "Please check your email for the 6-digit OTP",
-      });
       
-      // OTP is 6-digit for enhanced security and sent via email using Resend
+      // TEST MODE: Show OTP hint if in test mode
+      if (data?.testMode && data?.testOtp) {
+        setTestOtpHint(data.testOtp);
+        toast({
+          title: "Test Mode Active",
+          description: `Use OTP: ${data.testOtp} for testing`,
+        });
+      } else {
+        toast({
+          title: "OTP Sent",
+          description: "Please check your email for the 6-digit OTP",
+        });
+      }
     } catch (error: any) {
       console.error("Error sending OTP:", error);
       toast({
@@ -172,6 +181,15 @@ const Login = () => {
                 <p className="text-center text-text-secondary">
                   Enter the 6-digit OTP sent to your email
                 </p>
+                
+                {/* TEST MODE: Display OTP hint for development */}
+                {testOtpHint && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3 text-center">
+                    <p className="text-sm text-yellow-200">
+                      <strong>Test Mode:</strong> Use OTP <code className="bg-yellow-500/30 px-2 py-1 rounded font-mono">{testOtpHint}</code>
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex justify-center">
                   <InputOTP
