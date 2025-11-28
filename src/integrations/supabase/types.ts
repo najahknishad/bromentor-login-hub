@@ -506,6 +506,8 @@ export type Database = {
         | "resolved"
         | "closed"
         | "escalated"
+        | "closed_auto"
+        | "reopened"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -648,6 +650,8 @@ export const Constants = {
         "resolved",
         "closed",
         "escalated",
+        "closed_auto",
+        "reopened",
       ],
     },
   },
