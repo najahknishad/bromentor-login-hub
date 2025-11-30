@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DoubtSidebar } from '@/components/doubts/DoubtSidebar';
 import { DoubtChat } from '@/components/doubts/DoubtChat';
 import type { Doubt, DoubtStatus } from '@/components/doubts/types';
+import { BrandHeader } from '@/components/BrandHeader';
 
 const MyDoubts = () => {
   const { loading, isAuthenticated, user, role } = useAuth();
@@ -181,16 +182,19 @@ const MyDoubts = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top navigation */}
+      {/* Top navigation with branding */}
       <div className="border-b border-border p-4 flex items-center justify-between bg-card">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/dashboard')}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
+        <div className="flex items-center gap-4">
+          <BrandHeader />
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/dashboard')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
         {role === 'student' && (
           <Button onClick={() => navigate('/submit-doubt')} className="gap-2">
             <Plus className="h-4 w-4" />

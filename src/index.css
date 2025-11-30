@@ -44,7 +44,7 @@ All colors MUST be HSL.
     --gradient-start: 215 45% 8%;
     --gradient-end: 215 40% 18%;
     --text-secondary: 215 15% 75%;
-    --logo-bg: 0 0% 8%;
+    --logo-bg: 0 0% 92%;
 
     --sidebar-background: 0 0% 98%;
 
@@ -96,7 +96,7 @@ All colors MUST be HSL.
     --gradient-start: 215 45% 8%;
     --gradient-end: 215 40% 18%;
     --text-secondary: 215 15% 75%;
-    --logo-bg: 0 0% 8%;
+    --logo-bg: 0 0% 92%;
   }
 }
 

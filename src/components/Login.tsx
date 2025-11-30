@@ -157,10 +157,10 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8">
-        {/* Logo - Circular BRO icon */}
+        {/* Logo - Circular BRO icon with light background */}
         <div className="flex justify-center">
-          <div className="w-32 h-32 rounded-full bg-logo-bg flex items-center justify-center">
-            <span className="text-5xl font-bold text-foreground">BRO</span>
+          <div className="w-32 h-32 rounded-full bg-logo-bg flex items-center justify-center shadow-lg">
+            <span className="text-5xl font-bold text-slate-900">BRO</span>
           </div>
         </div>
 
@@ -169,8 +169,13 @@ const Login = () => {
           BroMentor
         </h1>
 
-        {/* Tagline - Exactly 2 lines as specified */}
-        <div className="text-center space-y-1">
+        {/* Main Tagline */}
+        <p className="text-lg text-primary text-center font-medium">
+          "Your doubt, our support — resolved in record time."
+        </p>
+
+        {/* Sign in text - Two separate lines */}
+        <div className="text-center space-y-1 pt-2">
           <p className="text-lg text-text-secondary">Sign in to continue</p>
           <p className="text-lg text-text-secondary">Built for Brototype students</p>
         </div>
