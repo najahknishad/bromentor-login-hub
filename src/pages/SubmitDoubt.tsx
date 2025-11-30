@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Upload, X, FileText, Image, Video, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { BrandHeader } from '@/components/BrandHeader';
 import { toast } from 'sonner';
 
 const SubmitDoubt = () => {
@@ -170,14 +171,18 @@ const SubmitDoubt = () => {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-3xl mx-auto">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/dashboard')}
-          className="mb-6 gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
+        {/* Brand Header */}
+        <div className="flex justify-between items-center mb-6">
+          <BrandHeader />
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/dashboard')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </div>
 
         <Card>
           <CardHeader>
