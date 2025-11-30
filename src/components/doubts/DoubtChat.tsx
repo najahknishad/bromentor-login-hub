@@ -116,7 +116,7 @@ export const DoubtChat = ({ doubt, userId, userRole, onDoubtUpdate }: DoubtChatP
     }
   }, [messages]);
 
-  const sendMessage = async (text: string) => {
+  /*const sendMessage = async (text: string) => {
     const { error } = await supabase
       .from('doubt_responses')
       .insert({
@@ -147,7 +147,46 @@ export const DoubtChat = ({ doubt, userId, userRole, onDoubtUpdate }: DoubtChatP
     if (isStaff && doubt.status === 'submitted') {
       await updateStatus('in_progress');
     }
-  };
+  };*/
+
+  const sendMessage = async (text: string) => {
+  const { data, error } = await supabase
+    .from('doubt_responses')
+    .insert({
+      doubt_id: doubt.id,
+      responder_id: userId,
+      response_text: text,
+      response_type: 'text',
+      created_at: new Date().toISOString(),       // FIX 1: required
+      sender_role: userRole                       // FIX 2: required
+    })
+    .select();                                     // FIX 3: necessary for RLS
+
+  if (error) {
+    console.error(error);
+    toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+    return;
+  }
+
+  // Notification
+  const recipientId = isStudent ? doubt.assigned_support_id : doubt.student_id;
+  if (recipientId) {
+    await supabase.from('notifications').insert({
+      user_id: recipientId,
+      doubt_id: doubt.id,
+      type: 'message',
+      title: 'New Message',
+      message: `New message in doubt: ${doubt.title}`,
+      created_at: new Date().toISOString()
+    });
+  }
+
+  // If staff sends first message, update status to in_progress
+  if (isStaff && doubt.status === 'submitted') {
+    await updateStatus('in_progress');
+  }
+};
+
 
   const uploadAndSendFile = async (file: File, type: 'attachment' | 'voice') => {
     const fileExt = file.name.split('.').pop();
