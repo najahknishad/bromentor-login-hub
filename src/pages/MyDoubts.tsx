@@ -2,33 +2,22 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Plus, Clock, CheckCircle, AlertCircle, RotateCcw, XCircle } from 'lucide-react';
+import { ArrowLeft, Plus, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { Database } from '@/integrations/supabase/types';
-
-type DoubtStatus = Database['public']['Enums']['doubt_status'];
-
-interface Doubt {
-  id: string;
-  title: string;
-  description: string;
-  status: DoubtStatus;
-  created_at: string;
-  updated_at: string;
-  resolved_at: string | null;
-  closed_at: string | null;
-  reopened_count: number;
-}
+import { DoubtSidebar } from '@/components/doubts/DoubtSidebar';
+import { DoubtChat } from '@/components/doubts/DoubtChat';
+import type { Doubt, DoubtStatus } from '@/components/doubts/types';
 
 const MyDoubts = () => {
-  const { loading, isAuthenticated, user } = useAuth();
+  const { loading, isAuthenticated, user, role } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [loadingDoubts, setLoadingDoubts] = useState(true);
+  const [selectedDoubt, setSelectedDoubt] = useState<Doubt | null>(null);
+  const [unreadDoubts, setUnreadDoubts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -36,33 +25,42 @@ const MyDoubts = () => {
     }
   }, [loading, isAuthenticated, navigate]);
 
-  // Fetch doubts
+  // Fetch doubts based on role
   useEffect(() => {
     if (!user) return;
 
     const fetchDoubts = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('doubts')
-        .select('id, title, description, status, created_at, updated_at, resolved_at, closed_at, reopened_count')
-        .eq('student_id', user.id)
-        .order('created_at', { ascending: false });
+        .select('id, title, description, status, created_at, updated_at, resolved_at, closed_at, reopened_count, student_id, assigned_support_id')
+        .order('updated_at', { ascending: false });
+
+      // Students see their own doubts, staff see assigned doubts
+      if (role === 'student') {
+        query = query.eq('student_id', user.id);
+      } else if (role === 'support') {
+        query = query.eq('assigned_support_id', user.id);
+      }
+      // Admin sees all doubts (no filter)
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching doubts:', error);
         toast({
           title: "Error",
-          description: "Failed to load your doubts",
+          description: "Failed to load doubts",
           variant: "destructive"
         });
       } else {
-        setDoubts(data || []);
+        setDoubts(data as Doubt[] || []);
       }
       setLoadingDoubts(false);
     };
 
     fetchDoubts();
 
-    // Real-time subscription
+    // Real-time subscription for doubts
     const channel = supabase
       .channel('my-doubts-changes')
       .on(
@@ -70,18 +68,56 @@ const MyDoubts = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'doubts',
-          filter: `student_id=eq.${user.id}`
+          table: 'doubts'
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setDoubts(prev => [payload.new as Doubt, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
+          const newDoubt = payload.new as Doubt;
+          const oldDoubt = payload.old as { id: string };
+          
+          // Filter based on role
+          const isRelevant = role === 'admin' || 
+            (role === 'student' && newDoubt?.student_id === user.id) ||
+            (role === 'support' && newDoubt?.assigned_support_id === user.id);
+
+          if (payload.eventType === 'INSERT' && isRelevant) {
+            setDoubts(prev => [newDoubt, ...prev]);
+          } else if (payload.eventType === 'UPDATE' && isRelevant) {
             setDoubts(prev => prev.map(d => 
-              d.id === payload.new.id ? payload.new as Doubt : d
+              d.id === newDoubt.id ? newDoubt : d
             ));
+            // Update selected doubt if it's the one being updated
+            if (selectedDoubt?.id === newDoubt.id) {
+              setSelectedDoubt(newDoubt);
+            }
+            // Mark as unread if status changed
+            if (selectedDoubt?.id !== newDoubt.id) {
+              setUnreadDoubts(prev => new Set(prev).add(newDoubt.id));
+            }
           } else if (payload.eventType === 'DELETE') {
-            setDoubts(prev => prev.filter(d => d.id !== payload.old.id));
+            setDoubts(prev => prev.filter(d => d.id !== oldDoubt.id));
+            if (selectedDoubt?.id === oldDoubt.id) {
+              setSelectedDoubt(null);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to notifications for unread indicators
+    const notifChannel = supabase
+      .channel('doubt-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          const notif = payload.new as { doubt_id: string | null };
+          if (notif.doubt_id && notif.doubt_id !== selectedDoubt?.id) {
+            setUnreadDoubts(prev => new Set(prev).add(notif.doubt_id!));
           }
         }
       )
@@ -89,8 +125,9 @@ const MyDoubts = () => {
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(notifChannel);
     };
-  }, [user, toast]);
+  }, [user, role, toast, selectedDoubt?.id]);
 
   // Auto-close check for resolved doubts older than 48 hours
   useEffect(() => {
@@ -119,115 +156,19 @@ const MyDoubts = () => {
     }
   }, [doubts]);
 
-  const handleCloseDoubt = async (doubtId: string) => {
-    const { error } = await supabase
-      .from('doubts')
-      .update({ 
-        status: 'closed' as DoubtStatus, 
-        closed_at: new Date().toISOString() 
-      })
-      .eq('id', doubtId);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to close doubt",
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Doubt closed successfully"
-      });
-    }
-  };
-
-  const handleReopenDoubt = async (doubt: Doubt) => {
-    // Check if already reopened once
-    if (doubt.reopened_count >= 1) {
-      toast({
-        title: "Cannot Reopen",
-        description: "This doubt has already been reopened once",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check if within 48 hours of closure
-    if (doubt.closed_at) {
-      const closedAt = new Date(doubt.closed_at);
-      const now = new Date();
-      const hoursSinceClosed = (now.getTime() - closedAt.getTime()) / (1000 * 60 * 60);
-      
-      if (hoursSinceClosed > 48) {
-        toast({
-          title: "Cannot Reopen",
-          description: "Reopening is only allowed within 48 hours of closure",
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-
-    const { error } = await supabase
-      .from('doubts')
-      .update({ 
-        status: 'reopened' as DoubtStatus, 
-        reopened_count: doubt.reopened_count + 1,
-        closed_at: null,
-        resolved_at: null
-      })
-      .eq('id', doubt.id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to reopen doubt",
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Doubt reopened successfully"
-      });
-    }
-  };
-
-  const getStatusBadge = (status: DoubtStatus) => {
-    const statusConfig: Record<DoubtStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
-      submitted: { label: 'Submitted', variant: 'secondary', icon: <Clock className="h-3 w-3" /> },
-      in_progress: { label: 'In Progress', variant: 'default', icon: <AlertCircle className="h-3 w-3" /> },
-      resolved: { label: 'Resolved', variant: 'outline', icon: <CheckCircle className="h-3 w-3" /> },
-      closed: { label: 'Closed', variant: 'secondary', icon: <XCircle className="h-3 w-3" /> },
-      closed_auto: { label: 'Closed (Auto)', variant: 'secondary', icon: <XCircle className="h-3 w-3" /> },
-      reopened: { label: 'Reopened', variant: 'destructive', icon: <RotateCcw className="h-3 w-3" /> },
-      escalated: { label: 'Escalated', variant: 'destructive', icon: <AlertCircle className="h-3 w-3" /> }
-    };
-
-    const config = statusConfig[status];
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        {config.icon}
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const canClose = (status: DoubtStatus) => status === 'resolved';
-  const canReopen = (doubt: Doubt) => 
-    (doubt.status === 'closed' || doubt.status === 'closed_auto') && 
-    doubt.reopened_count < 1 &&
-    doubt.closed_at &&
-    ((new Date().getTime() - new Date(doubt.closed_at).getTime()) / (1000 * 60 * 60)) <= 48;
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const handleSelectDoubt = (doubt: Doubt) => {
+    setSelectedDoubt(doubt);
+    // Remove from unread
+    setUnreadDoubts(prev => {
+      const next = new Set(prev);
+      next.delete(doubt.id);
+      return next;
     });
+  };
+
+  const handleDoubtUpdate = (updatedDoubt: Doubt) => {
+    setDoubts(prev => prev.map(d => d.id === updatedDoubt.id ? updatedDoubt : d));
+    setSelectedDoubt(updatedDoubt);
   };
 
   if (loading) {
@@ -239,101 +180,83 @@ const MyDoubts = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/dashboard')}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top navigation */}
+      <div className="border-b border-border p-4 flex items-center justify-between bg-card">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate('/dashboard')}
+          className="gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+        {role === 'student' && (
           <Button onClick={() => navigate('/submit-doubt')} className="gap-2">
             <Plus className="h-4 w-4" />
             Submit New Doubt
           </Button>
-        </div>
+        )}
+      </div>
 
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">My Doubts</h1>
-          <p className="text-muted-foreground">Track your submitted doubts and their status</p>
-        </header>
-
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
         {loadingDoubts ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex-1 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : doubts.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-lg">No doubts submitted yet.</p>
-              <Button 
-                onClick={() => navigate('/submit-doubt')} 
-                className="mt-4"
-              >
-                Submit Your First Doubt
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {doubts.map((doubt) => (
-              <Card key={doubt.id} className="hover:border-primary/50 transition-colors">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <CardTitle className="text-lg font-semibold line-clamp-2">
-                      {doubt.title}
-                    </CardTitle>
-                    {getStatusBadge(doubt.status)}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
-                    {doubt.description}
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-4">
-                    <span>Submitted: {formatDate(doubt.created_at)}</span>
-                    {doubt.updated_at !== doubt.created_at && (
-                      <span>Updated: {formatDate(doubt.updated_at)}</span>
-                    )}
-                    {doubt.resolved_at && (
-                      <span>Resolved: {formatDate(doubt.resolved_at)}</span>
-                    )}
-                    {doubt.closed_at && (
-                      <span>Closed: {formatDate(doubt.closed_at)}</span>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    {canClose(doubt.status) && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleCloseDoubt(doubt.id)}
-                        variant="outline"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Confirm & Close
-                      </Button>
-                    )}
-                    {canReopen(doubt) && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleReopenDoubt(doubt)}
-                        variant="secondary"
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Reopen Doubt
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex-1 flex items-center justify-center p-6">
+            <Card className="max-w-md w-full">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-lg text-center">
+                  {role === 'student' 
+                    ? "No doubts submitted yet." 
+                    : "No doubts assigned to you yet."}
+                </p>
+                {role === 'student' && (
+                  <Button 
+                    onClick={() => navigate('/submit-doubt')} 
+                    className="mt-4"
+                  >
+                    Submit Your First Doubt
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
           </div>
+        ) : (
+          <>
+            {/* Sidebar with doubts list */}
+            <div className="w-80 flex-shrink-0 h-full">
+              <DoubtSidebar
+                doubts={doubts}
+                selectedDoubtId={selectedDoubt?.id || null}
+                onSelectDoubt={handleSelectDoubt}
+                unreadDoubts={unreadDoubts}
+              />
+            </div>
+
+            {/* Chat area */}
+            <div className="flex-1 h-full">
+              {selectedDoubt ? (
+                <DoubtChat
+                  doubt={selectedDoubt}
+                  userId={user!.id}
+                  userRole={role || 'student'}
+                  onDoubtUpdate={handleDoubtUpdate}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <p className="text-lg">Select a doubt to view the discussion</p>
+                    <p className="text-sm mt-1">Choose from the list on the left</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
